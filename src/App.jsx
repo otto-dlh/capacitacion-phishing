@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 /* ============================================================
    SEGURO — Capacitación anti-phishing para pymes (Guatemala)
@@ -2064,6 +2064,491 @@ function Admin() {
   );
 }
 
+/* ---------------------- PITCH / INVERSIONISTAS ---------------------- */
+
+const fmtQ = (n) => "Q" + n.toLocaleString("es-GT");
+const fmtQc = (n) => (n >= 1e6 ? `Q${(n / 1e6).toLocaleString("es-GT", { maximumFractionDigits: 2 })}M` : `Q${Math.round(n / 1e3)}k`);
+
+const PITCH_CSS = `
+.pv-lift { transition: transform .18s ease, box-shadow .18s ease; }
+.pv-lift:hover { transform: translateY(-4px); box-shadow: 0 16px 34px rgba(12,31,34,.14); }
+.pv-seg { border: 2px solid ${T.line}; background: ${T.surface}; color: ${T.inkSoft}; font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 13px; padding: 9px 18px; border-radius: 999px; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.pv-seg.on { background: ${T.brand}; border-color: ${T.brand}; color: #fff; }
+.pv-seg:hover:not(.on) { border-color: ${T.brand}; color: ${T.brand}; }
+@media (max-width: 720px) { .pv-tl-line { display: none; } }
+`;
+
+const PITCH_METRICS = [
+  { to: 57600, prefix: "Q", label: "LTV", note: "Valor de vida del cliente" },
+  { to: 72, suffix: "×", label: "LTV / CAC", note: "Rango excepcional para SaaS/MSSP" },
+  { to: 80, suffix: "%", label: "Margen bruto", note: "Sobre servicios recurrentes" },
+  { to: 9360, prefix: "Q", label: "MRR al mes 12", note: "Ingreso recurrente proyectado" },
+  { to: 800, prefix: "Q", label: "CAC", note: "Costo de adquisición B2B" },
+  { to: 1, suffix: "%", label: "Churn mensual", note: "Retención del 99%" },
+  { to: 1712, prefix: "Q", label: "Burn rate", note: "Gasto neto de caja mensual" },
+  { to: 157, label: "Meses de runway", note: "Con el capital actual" },
+];
+
+const PITCH_PNL = [
+  { year: "2026", ingresos: 333810, gastos: 640362, ebitda: -306552 },
+  { year: "2027", ingresos: 1450000, gastos: 980000, ebitda: 470000 },
+  { year: "2028", ingresos: 2850000, gastos: 1450000, ebitda: 1400000 },
+];
+
+const PITCH_SCENARIOS = [
+  { id: "optimista", name: "Optimista", growth: "8%", churn: "1%", ebitda: 1800000, note: "Adopción acelerada del canal MSSP y ciclos de venta más cortos." },
+  { id: "base", name: "Base", growth: "6%", churn: "1%", ebitda: 1400000, note: "El plan presentado en este pitch: 30 clientes al mes 12, MRR duplicado al mes 18." },
+  { id: "pesimista", name: "Pesimista", growth: "3%", churn: "3%", ebitda: 850000, note: "Aun con la mitad del crecimiento y el triple de churn, el negocio sigue siendo rentable al año 3." },
+];
+
+const PITCH_FUNDS = [
+  { label: "Marketing y ventas", detail: "Adquisición de clientes MSSP", pct: 35, amount: 94500, color: "#0E5E63" },
+  { label: "Tecnología", detail: "Infraestructura, licencias, herramientas", pct: 26, amount: 70000, color: "#37838A" },
+  { label: "Operaciones", detail: "Soporte, automatización, administración", pct: 24, amount: 65000, color: "#699FA5" },
+  { label: "Capital de trabajo", detail: "Reserva para gastos fijos", pct: 15, amount: 40500, color: "#A3C8CA" },
+];
+
+const PITCH_ROADMAP = [
+  { when: "Hoy", what: "Plataforma en producción y 2 empresas piloto activas en servicios, comercio, educación privada y despachos profesionales." },
+  { when: "Mes 12", what: "30 clientes MSSP: punto de equilibrio alcanzado. Flujo operativo positivo." },
+  { when: "Mes 18", what: "MRR duplicado y equipo comercial consolidado." },
+  { when: "Año 3", what: "Q2.85M de ingresos anuales y expansión regional en Centroamérica." },
+];
+
+function useInView(threshold = 0.25) {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setInView(true); io.disconnect(); } },
+      { threshold }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [threshold]);
+  return [ref, inView];
+}
+
+function CountUp({ to, prefix = "", suffix = "", dur = 1400 }) {
+  const [ref, inView] = useInView(0.5);
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!inView) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setVal(to); return; }
+    let raf;
+    const t0 = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / dur);
+      setVal(Math.round(to * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [inView, to, dur]);
+  return <span ref={ref}>{prefix}{val.toLocaleString("es-GT")}{suffix}</span>;
+}
+
+function Reveal({ children, delay = 0 }) {
+  const [ref, inView] = useInView(0.12);
+  return (
+    <div ref={ref} style={{ opacity: inView ? 1 : 0, transform: inView ? "none" : "translateY(22px)", transition: `opacity .6s ease ${delay}ms, transform .6s ease ${delay}ms` }}>
+      {children}
+    </div>
+  );
+}
+
+const PitchSection = ({ kicker, title, intro, children, id }) => (
+  <section id={id} style={{ marginTop: 52, scrollMarginTop: 80 }}>
+    <Reveal>
+      <Badge tone="brand">{kicker}</Badge>
+      <h3 className="sg-display" style={{ fontSize: "clamp(21px, 3vw, 27px)", fontWeight: 800, margin: "12px 0 8px" }}>{title}</h3>
+      {intro && <p style={{ color: T.inkSoft, fontSize: 14.5, lineHeight: 1.6, margin: "0 0 18px", maxWidth: 680 }}>{intro}</p>}
+      {children}
+    </Reveal>
+  </section>
+);
+
+function BreakEvenTrack() {
+  const [ref, inView] = useInView(0.4);
+  return (
+    <div ref={ref} style={{ padding: "44px 6px 40px" }}>
+      <div style={{ position: "relative", height: 18, borderRadius: 999, background: `linear-gradient(90deg, ${T.line} 0 75%, ${T.okSoft} 75% 100%)` }}>
+        <div style={{ position: "absolute", inset: 0, width: inView ? "75%" : "5%", transition: "width 1.4s cubic-bezier(.2,.7,.2,1)", borderRadius: 999, background: `linear-gradient(90deg, #699FA5, ${T.brand})` }} />
+        {/* Hoy */}
+        <div style={{ position: "absolute", left: "5%", top: "50%", transform: "translate(-50%,-50%)", width: 16, height: 16, borderRadius: "50%", background: T.chipBg, border: "3px solid #fff", boxShadow: "0 2px 6px rgba(12,31,34,.3)" }} />
+        <div style={{ position: "absolute", left: "5%", top: 26, transform: "translateX(-30%)", fontSize: 12, color: T.inkSoft, whiteSpace: "nowrap" }}>
+          <b style={{ color: T.ink }}>Hoy</b> · 2 pilotos
+        </div>
+        {/* Break-even */}
+        <div style={{ position: "absolute", left: "75%", top: -8, bottom: -8, width: 3, background: T.ink, borderRadius: 2 }} />
+        <div className="sg-display" style={{ position: "absolute", left: "75%", bottom: 30, transform: "translateX(-50%)", fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", background: T.chipBg, color: T.chipTx, padding: "5px 12px", borderRadius: 999 }}>
+          Break-even: 30 clientes · mes 12
+        </div>
+        <div style={{ position: "absolute", left: "77.5%", right: 0, top: 26, fontSize: 12, fontWeight: 700, color: T.ok, whiteSpace: "nowrap" }}>
+          Zona de utilidad →
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RevenueChart() {
+  const [ref, inView] = useInView(0.35);
+  const max = Math.max(...PITCH_PNL.map((r) => r.ingresos));
+  return (
+    <div ref={ref} style={{ display: "flex", gap: 16, alignItems: "flex-end", padding: "6px 4px 0" }}>
+      {PITCH_PNL.map((r, i) => {
+        const h = Math.max(8, Math.round((r.ingresos / max) * 180));
+        return (
+          <div key={r.year} style={{ flex: 1, maxWidth: 170, textAlign: "center" }} title={`${r.year}: ingresos ${fmtQ(r.ingresos)}, gastos ${fmtQ(r.gastos)}`}>
+            <div style={{ height: 210, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center" }}>
+              <div className="sg-display" style={{ fontWeight: 800, fontSize: "clamp(13px, 2vw, 17px)", color: T.brand, marginBottom: 6 }}>{fmtQc(r.ingresos)}</div>
+              <div style={{ width: "68%", height: inView ? h : 0, transition: `height .9s cubic-bezier(.2,.7,.2,1) ${i * 140}ms`, background: "linear-gradient(180deg, #2E8F95, #0E5E63)", borderRadius: "8px 8px 0 0" }} />
+            </div>
+            <div style={{ borderTop: `2px solid ${T.ink}`, paddingTop: 8, marginTop: 0 }}>
+              <div className="sg-display" style={{ fontWeight: 800, fontSize: 15 }}>{r.year}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2, color: r.ebitda >= 0 ? T.ok : T.danger }}>
+                EBITDA {r.ebitda >= 0 ? "+" : "−"}{fmtQc(Math.abs(r.ebitda))}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScenarioExplorer() {
+  const [sc, setSc] = useState("base");
+  const cur = PITCH_SCENARIOS.find((s) => s.id === sc);
+  const maxE = Math.max(...PITCH_SCENARIOS.map((s) => s.ebitda));
+  return (
+    <div className="sg-card" style={{ padding: 22, marginTop: 14 }}>
+      <div className="sg-display" style={{ fontWeight: 800, fontSize: 16 }}>Pruebe usted mismo los tres escenarios</div>
+      <p style={{ fontSize: 13, color: T.inkSoft, margin: "4px 0 14px" }}>En los tres, el negocio es rentable al año 3. Elija uno:</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {PITCH_SCENARIOS.map((s) => (
+          <button key={s.id} className={`pv-seg${sc === s.id ? " on" : ""}`} onClick={() => setSc(s.id)}>
+            {s.name}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 26, flexWrap: "wrap", marginTop: 18 }}>
+        {[
+          [cur.growth, "crecimiento mensual"],
+          [cur.churn, "churn mensual"],
+        ].map(([v, l]) => (
+          <div key={l}>
+            <div className="sg-display" style={{ fontSize: 24, fontWeight: 800 }}>{v}</div>
+            <div style={{ fontSize: 12, color: T.inkSoft }}>{l}</div>
+          </div>
+        ))}
+        <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <span style={{ fontSize: 12, color: T.inkSoft }}>EBITDA año 3</span>
+            <span className="sg-display" style={{ fontSize: 24, fontWeight: 800, color: T.ok }}>{fmtQ(cur.ebitda)}</span>
+          </div>
+          <div style={{ background: T.line, borderRadius: 999, height: 14, overflow: "hidden", marginTop: 6 }}>
+            <div style={{ width: `${Math.round((cur.ebitda / maxE) * 100)}%`, background: T.ok, height: "100%", borderRadius: 999, transition: "width .5s cubic-bezier(.2,.7,.2,1)" }} />
+          </div>
+        </div>
+      </div>
+      <p style={{ fontSize: 13.5, lineHeight: 1.55, margin: "14px 0 0", background: T.bg, borderRadius: 10, padding: "10px 14px" }}>{cur.note}</p>
+    </div>
+  );
+}
+
+function FundsDonut() {
+  const size = 200, stroke = 32;
+  const R = (size - stroke) / 2;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Distribución del uso de fondos: marketing 35%, tecnología 26%, operaciones 24%, capital de trabajo 15%">
+      <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+        {PITCH_FUNDS.map((f) => {
+          const frac = f.pct / 100;
+          const dash = Math.max(0, frac * C - 3);
+          const off = -(acc * C);
+          acc += frac;
+          return (
+            <circle key={f.label} cx={size / 2} cy={size / 2} r={R} fill="none" stroke={f.color} strokeWidth={stroke} strokeDasharray={`${dash} ${C - dash}`} strokeDashoffset={off}>
+              <title>{`${f.label}: ${f.pct}% · ${fmtQ(f.amount)}`}</title>
+            </circle>
+          );
+        })}
+      </g>
+      <text x="50%" y="47%" textAnchor="middle" style={{ font: "800 21px Archivo, system-ui, sans-serif", fill: T.ink }}>Q270,000</text>
+      <text x="50%" y="58%" textAnchor="middle" style={{ font: "500 11px Inter, system-ui, sans-serif", fill: T.inkSoft }}>capital semilla</text>
+    </svg>
+  );
+}
+
+function Pitch() {
+  const th = { textAlign: "left", padding: "10px 14px", fontSize: 12, letterSpacing: ".06em", textTransform: "uppercase", color: T.inkSoft, borderBottom: `2px solid ${T.line}`, whiteSpace: "nowrap" };
+  const td = { padding: "11px 14px", fontSize: 14, borderBottom: `1px solid ${T.line}`, whiteSpace: "nowrap" };
+  const mail = "mailto:contacto@cibercultura.gt?subject=Interés%20en%20invertir%20en%20CiberCultura";
+  const goMetrics = () => document.getElementById("pv-metricas")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  return (
+    <div>
+      <style>{PITCH_CSS}</style>
+
+      {/* Hero */}
+      <Reveal>
+        <div
+          style={{
+            borderRadius: 20, padding: "clamp(28px, 5vw, 52px)", color: "#fff", overflow: "hidden", position: "relative",
+            background: `radial-gradient(900px 420px at 88% -20%, rgba(37,121,79,.45), transparent 62%), radial-gradient(700px 380px at -12% 115%, rgba(14,94,99,.65), transparent 60%), ${T.chipBg}`,
+          }}
+        >
+          <span className="sg-display" style={{ display: "inline-block", background: "rgba(191,227,214,.14)", color: T.chipTx, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", padding: "6px 14px", borderRadius: 999, border: "1px solid rgba(191,227,214,.35)" }}>
+            Oportunidad de inversión · Capital semilla
+          </span>
+          <h2 className="sg-display" style={{ fontSize: "clamp(30px, 5.5vw, 52px)", lineHeight: 1.07, margin: "18px 0 14px", fontWeight: 800, maxWidth: 760 }}>
+            Las pymes ya son el blanco.
+            <br />
+            <span style={{ color: T.chipTx }}>CiberCultura las convierte en el firewall.</span>
+          </h2>
+          <p style={{ color: "#D7E4E0", fontSize: "clamp(14px, 1.8vw, 16.5px)", lineHeight: 1.65, maxWidth: 640, margin: 0 }}>
+            Ciberseguridad gestionada por suscripción (MSSP) más consultoría especializada, diseñada y cotizada
+            para las pymes de Guatemala. La plataforma que usted está usando en este momento
+            <b style={{ color: "#fff" }}> es el producto, ya en producción.</b>
+          </p>
+          <div style={{ display: "flex", gap: "clamp(20px, 4vw, 44px)", marginTop: 28, flexWrap: "wrap" }}>
+            {[
+              { to: 270000, prefix: "Q", label: "capital solicitado" },
+              { to: 12, label: "meses al break-even" },
+              { to: 3, suffix: "×", label: "ingresos en 36 meses" },
+            ].map((s) => (
+              <div key={s.label}>
+                <div className="sg-display" style={{ fontSize: "clamp(26px, 3.4vw, 36px)", fontWeight: 800, color: "#fff" }}>
+                  <CountUp to={s.to} prefix={s.prefix || ""} suffix={s.suffix || ""} />
+                </div>
+                <div style={{ fontSize: 12.5, color: "#9DB8B2" }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 28 }}>
+            <a href={mail} className="sg-btn" style={{ display: "inline-block", background: T.chipTx, color: T.chipBg, padding: "13px 26px", fontSize: 15, textDecoration: "none" }}>
+              Quiero invertir
+            </a>
+            <button className="sg-btn" onClick={goMetrics} style={{ background: "transparent", color: "#fff", border: "2px solid rgba(255,255,255,.4)", padding: "11px 24px", fontSize: 15 }}>
+              Ver los números ↓
+            </button>
+          </div>
+        </div>
+      </Reveal>
+
+      {/* Oportunidad */}
+      <PitchSection kicker="La oportunidad" title="Un mercado enorme, desprotegido y sin oferta a su medida">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
+          {[
+            { icon: "📧", stat: "90%", text: "de los incidentes de seguridad en empresas pequeñas comienza con un simple correo de phishing." },
+            { icon: "💸", stat: "Q48,500", text: "puede costar una sola transferencia desviada por fraude BEC — más de dos años de nuestra suscripción completa." },
+            { icon: "🛡️", stat: "80%", text: "de la protección se logra con hábitos y procesos simples. Nadie se los está enseñando a las pymes. Ese es nuestro mercado." },
+          ].map((c, i) => (
+            <div key={c.stat} className="sg-card pv-lift" style={{ padding: "22px 20px", borderTop: `4px solid ${i === 1 ? T.danger : T.brand}` }}>
+              <div style={{ fontSize: 26 }}>{c.icon}</div>
+              <div className="sg-display" style={{ fontSize: 34, fontWeight: 800, color: i === 1 ? T.danger : T.brand, margin: "6px 0 4px" }}>{c.stat}</div>
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: T.inkSoft, margin: 0 }}>{c.text}</p>
+            </div>
+          ))}
+        </div>
+      </PitchSection>
+
+      {/* Modelo de negocio */}
+      <PitchSection kicker="Modelo de negocio" title="Dos motores de ingreso que se alimentan entre sí">
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <div className="sg-card pv-lift" style={{ flex: "1 1 300px", padding: 22, borderTop: `4px solid ${T.brand}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div className="sg-display" style={{ fontSize: 17, fontWeight: 800 }}>Suscripción MSSP</div>
+              <Badge tone="brand">65% del mix</Badge>
+            </div>
+            <div className="sg-display" style={{ fontSize: 34, fontWeight: 800, color: T.brand, marginTop: 10 }}>
+              Q1,800<span style={{ fontSize: 14, color: T.inkSoft, fontWeight: 600 }}> /cliente·mes</span>
+            </div>
+            <p style={{ fontSize: 13.5, color: T.inkSoft, lineHeight: 1.6, margin: "8px 0 0" }}>
+              Ingreso recurrente y predecible: simulaciones de phishing, microcapacitaciones, monitoreo, alertas,
+              hardening, seguimiento y reportes de resultados.
+            </p>
+          </div>
+          <div className="sg-card pv-lift" style={{ flex: "1 1 300px", padding: 22, borderTop: `4px solid ${T.warn}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div className="sg-display" style={{ fontSize: 17, fontWeight: 800 }}>Proyectos de consultoría</div>
+              <Badge tone="warn">35% del mix</Badge>
+            </div>
+            <div className="sg-display" style={{ fontSize: 34, fontWeight: 800, color: T.warn, marginTop: 10 }}>
+              Q15,000<span style={{ fontSize: 14, color: T.inkSoft, fontWeight: 600 }}> /proyecto</span>
+            </div>
+            <p style={{ fontSize: 13.5, color: T.inkSoft, lineHeight: 1.6, margin: "8px 0 0" }}>
+              Tickets altos: auditorías, pentesting, campañas especiales de concientización y acompañamiento en
+              cumplimiento ISO/NIST.
+            </p>
+          </div>
+        </div>
+        <div style={{ background: T.brandSoft, borderRadius: 12, padding: "13px 18px", marginTop: 14, fontSize: 13.5, lineHeight: 1.55, display: "flex", gap: 10, alignItems: "center" }}>
+          <span style={{ fontSize: 20 }}>🔁</span>
+          <span><b>El círculo virtuoso:</b> cada proyecto de consultoría abre la puerta a una suscripción; cada suscriptor genera nuevos proyectos. Un solo cliente, dos fuentes de ingreso.</span>
+        </div>
+      </PitchSection>
+
+      {/* Métricas */}
+      <PitchSection
+        id="pv-metricas"
+        kicker="Tracción y unidad económica"
+        title="Los números que un inversionista quiere ver"
+        intro="Propuesta validada con 2 empresas piloto guatemaltecas en los sectores de servicios, comercio, educación privada y despachos profesionales."
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))", gap: 12 }}>
+          {PITCH_METRICS.map((m) => (
+            <div key={m.label} className="sg-card pv-lift" style={{ padding: "16px 18px" }}>
+              <div className="sg-display" style={{ fontSize: 27, fontWeight: 800, color: T.brand, lineHeight: 1.1 }}>
+                <CountUp to={m.to} prefix={m.prefix || ""} suffix={m.suffix || ""} />
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 5 }}>{m.label}</div>
+              <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 2, lineHeight: 1.45 }}>{m.note}</div>
+            </div>
+          ))}
+        </div>
+      </PitchSection>
+
+      {/* Break-even */}
+      <PitchSection kicker="Camino a la utilidad" title="Break-even con solo 30 clientes">
+        <div className="sg-card" style={{ padding: "8px 22px 4px" }}>
+          <BreakEvenTrack />
+          <p style={{ fontSize: 13.5, color: T.inkSoft, lineHeight: 1.6, margin: "0 0 18px" }}>
+            Con 30 clientes MSSP la empresa cubre todos sus costos fijos y variables.{" "}
+            <b style={{ color: T.ink }}>A partir del cliente 31, cada quetzal de ingreso recurrente se convierte en utilidad neta</b> —
+            con un margen bruto del 80% y un churn de apenas 1%.
+          </p>
+        </div>
+      </PitchSection>
+
+      {/* Proyecciones */}
+      <PitchSection kicker="Proyecciones · 36 meses" title="De la inversión a triplicar ingresos">
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "stretch" }}>
+          <div className="sg-card" style={{ flex: "1 1 340px", padding: 22 }}>
+            <div className="sg-display" style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Ingresos anuales — escenario base</div>
+            <RevenueChart />
+            <p style={{ fontSize: 12.5, color: T.inkSoft, lineHeight: 1.55, margin: "14px 0 0" }}>
+              Rentabilidad sostenida desde el mes 12. Flujo acumulado al mes 12: −Q530,272, financiable sin deuda
+              durante 12 a 18 meses.
+            </p>
+          </div>
+          <div className="sg-card" style={{ flex: "1 1 340px", padding: 22 }}>
+            <div className="sg-display" style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Estado de resultados proyectado</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 380 }}>
+                <thead>
+                  <tr>
+                    <th style={th}>Año</th><th style={th}>Ingresos</th><th style={th}>Gastos</th><th style={th}>EBITDA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PITCH_PNL.map((r) => (
+                    <tr key={r.year}>
+                      <td style={{ ...td, fontWeight: 700 }}>{r.year}</td>
+                      <td style={td}>{fmtQ(r.ingresos)}</td>
+                      <td style={td}>{fmtQ(r.gastos)}</td>
+                      <td style={{ ...td, color: r.ebitda >= 0 ? T.ok : T.danger, fontWeight: 700 }}>
+                        {r.ebitda >= 0 ? "+" : "−"}{fmtQ(Math.abs(r.ebitda))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ fontSize: 12.5, color: T.inkSoft, lineHeight: 1.55, margin: "14px 0 0" }}>
+              La inversión de un año negativo (2026) compra una máquina que genera Q1.4M de EBITDA al tercer año.
+            </p>
+          </div>
+        </div>
+        <ScenarioExplorer />
+      </PitchSection>
+
+      {/* Uso de fondos */}
+      <PitchSection kicker="La inversión" title="Cada quetzal de los Q270,000, con nombre y apellido">
+        <div className="sg-card" style={{ padding: 22 }}>
+          <div style={{ display: "flex", gap: 26, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ flex: "0 0 auto", margin: "0 auto" }}>
+              <FundsDonut />
+            </div>
+            <div style={{ flex: "1 1 300px", minWidth: 260 }}>
+              {PITCH_FUNDS.map((f) => (
+                <div key={f.label} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "9px 0", borderBottom: `1px solid ${T.line}` }}>
+                  <span style={{ width: 13, height: 13, borderRadius: 4, background: f.color, flexShrink: 0, alignSelf: "center" }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{f.label}</div>
+                    <div style={{ fontSize: 12, color: T.inkSoft }}>{f.detail}</div>
+                  </div>
+                  <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <div className="sg-display" style={{ fontWeight: 800, fontSize: 16 }}>{f.pct}%</div>
+                    <div style={{ fontSize: 12, color: T.inkSoft }}>{fmtQ(f.amount)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: T.warnSoft, borderLeft: `4px solid ${T.warn}`, borderRadius: "0 10px 10px 0", padding: "12px 16px", marginTop: 18, fontSize: 13.5, lineHeight: 1.55 }}>
+            <b>Objetivo del capital:</b> alcanzar 30 clientes MSSP (break-even) en 12 meses y duplicar el MRR en 18 meses.
+          </div>
+        </div>
+      </PitchSection>
+
+      {/* Roadmap */}
+      <PitchSection kicker="Hoja de ruta" title="De 2 pilotos a la expansión regional">
+        <div style={{ position: "relative" }}>
+          <div className="pv-tl-line" style={{ position: "absolute", top: 9, left: 10, right: 10, height: 2, background: T.line }} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 18 }}>
+            {PITCH_ROADMAP.map((r, i) => (
+              <Reveal key={r.when} delay={i * 120}>
+                <div>
+                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: i === 0 ? T.brand : T.surface, border: `4px solid ${T.brand}`, position: "relative", zIndex: 1 }} />
+                  <div className="sg-display" style={{ fontWeight: 800, fontSize: 17, margin: "10px 0 4px", color: T.brand }}>{r.when}</div>
+                  <p style={{ fontSize: 13.5, lineHeight: 1.6, color: T.inkSoft, margin: 0 }}>{r.what}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </PitchSection>
+
+      {/* Cierre */}
+      <section style={{ marginTop: 52 }}>
+        <Reveal>
+          <div style={{ borderRadius: 20, padding: "clamp(30px, 5vw, 48px)", textAlign: "center", background: `linear-gradient(135deg, ${T.brand}, ${T.chipBg} 75%)` }}>
+            <h3 className="sg-display" style={{ color: "#fff", fontSize: "clamp(22px, 3.6vw, 34px)", fontWeight: 800, margin: 0, lineHeight: 1.2, maxWidth: 700, marginInline: "auto" }}>
+              No le pedimos que imagine el producto. Acaba de usarlo.
+            </h3>
+            <p style={{ color: "#D7E4E0", fontSize: 14.5, lineHeight: 1.65, maxWidth: 620, margin: "14px auto 0" }}>
+              Break-even rápido, burn rate bajo, LTV/CAC de 72× y rentabilidad incluso en el escenario pesimista.
+              CiberCultura es un modelo sólido, escalable y listo para crecer con el socio correcto.
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 22 }}>
+              <a href={mail} className="sg-btn" style={{ display: "inline-block", background: "#fff", color: T.brand, padding: "13px 28px", fontSize: 15, textDecoration: "none" }}>
+                Agendar una reunión
+              </a>
+              <a
+                href="mailto:contacto@cibercultura.gt?subject=Solicitud%20del%20pitch%20financiero%20completo"
+                className="sg-btn"
+                style={{ display: "inline-block", background: "transparent", color: "#fff", border: "2px solid rgba(255,255,255,.45)", padding: "11px 26px", fontSize: 15, textDecoration: "none" }}
+              >
+                Solicitar el pitch completo
+              </a>
+            </div>
+          </div>
+        </Reveal>
+        <p style={{ fontSize: 12, color: T.inkSoft, textAlign: "center", marginTop: 12 }}>
+          Cifras del pitch financiero de CiberCultura (escenario base, proyección a 36 meses). Documento completo disponible bajo solicitud.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 /* ============================== APP ============================== */
 
 const NAV = [
@@ -2074,10 +2559,18 @@ const NAV = [
   { id: "evaluacion", label: "Evaluación" },
   { id: "recursos", label: "Recursos" },
   { id: "admin", label: "Panel admin" },
+  { id: "pitch", label: "Inversionistas" },
 ];
 
 export default function App() {
-  const [view, setView] = useState("inicio");
+  const [view, setView] = useState(() => {
+    const h = window.location.hash.replace("#", "");
+    return NAV.some((n) => n.id === h) ? h : "inicio";
+  });
+  useEffect(() => {
+    window.history.replaceState(null, "", view === "inicio" ? window.location.pathname : `#${view}`);
+    window.scrollTo(0, 0);
+  }, [view]);
   const [progress, setProgress] = useState({ lessons: new Set(), quizzes: new Set() });
   const [simState, setSimState] = useState({});
   const [smsState, setSmsState] = useState({});
@@ -2126,6 +2619,7 @@ export default function App() {
         {view === "evaluacion" && <Exam examResult={examResult} setExamResult={setExamResult} />}
         {view === "recursos" && <Resources />}
         {view === "admin" && <Admin />}
+        {view === "pitch" && <Pitch />}
       </main>
 
       <footer style={{ borderTop: `1px solid ${T.line}`, padding: "18px 20px", textAlign: "center", fontSize: 12, color: T.inkSoft }}>
