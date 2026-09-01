@@ -41,6 +41,17 @@ body { margin: 0; }
 .sg-hot:hover { background: ${T.warnSoft}; }
 .ol-item:hover { background: #F3F2F1 !important; }
 .ol-cmd:hover:not(:disabled) { background: #F3F2F1; border-radius: 4px; }
+.sg-burger { display: none; border: none; background: transparent; cursor: pointer; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 12px 10px; margin-left: auto; border-radius: 8px; }
+.sg-burger:focus-visible { outline: 3px solid ${T.warn}; outline-offset: 2px; }
+.sg-burger span { display: block; width: 21px; height: 2.5px; background: ${T.ink}; border-radius: 2px; transition: transform .2s ease, opacity .2s ease; }
+.sg-mobilemenu { display: none; }
+@keyframes sgMenuIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes sgItemIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  .sg-desktopnav { display: none !important; }
+  .sg-burger { display: inline-flex; }
+  .sg-mobilemenu { display: block; }
+}
 @media (max-width: 820px) { .ol-folders { display: none !important; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 `;
@@ -2571,6 +2582,7 @@ export default function App() {
     window.history.replaceState(null, "", view === "inicio" ? window.location.pathname : `#${view}`);
     window.scrollTo(0, 0);
   }, [view]);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [progress, setProgress] = useState({ lessons: new Set(), quizzes: new Set() });
   const [simState, setSimState] = useState({});
   const [smsState, setSmsState] = useState({});
@@ -2592,7 +2604,7 @@ export default function App() {
             <span style={{ background: T.brand, color: "#fff", borderRadius: 8, padding: "3px 8px", fontSize: 14 }}>◉</span>
             SEGURO<span style={{ color: T.brand }}>·GT</span>
           </div>
-          <nav style={{ display: "flex", gap: 2, overflowX: "auto", flex: 1 }}>
+          <nav className="sg-desktopnav" style={{ display: "flex", gap: 2, overflowX: "auto", flex: 1 }}>
             {NAV.map((n) => (
               <button
                 key={n.id}
@@ -2608,7 +2620,37 @@ export default function App() {
               </button>
             ))}
           </nav>
+          <button
+            className="sg-burger"
+            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            <span style={{ transform: menuOpen ? "translateY(7.5px) rotate(45deg)" : "none" }} />
+            <span style={{ opacity: menuOpen ? 0 : 1 }} />
+            <span style={{ transform: menuOpen ? "translateY(-7.5px) rotate(-45deg)" : "none" }} />
+          </button>
         </div>
+        {menuOpen && (
+          <nav className="sg-mobilemenu" style={{ borderTop: `1px solid ${T.line}`, background: T.surface, boxShadow: "0 18px 28px rgba(12,31,34,.14)", animation: "sgMenuIn .22s ease-out" }}>
+            {NAV.map((n, i) => (
+              <button
+                key={n.id}
+                className="sg-nav"
+                onClick={() => { setView(n.id); setMenuOpen(false); }}
+                style={{
+                  display: "block", width: "100%", textAlign: "left", padding: "14px 22px", fontSize: 15, fontWeight: 700,
+                  color: view === n.id ? T.brand : T.ink,
+                  background: view === n.id ? T.brandSoft : "transparent",
+                  borderLeft: `4px solid ${view === n.id ? T.brand : "transparent"}`,
+                  animation: `sgItemIn .3s ease-out ${i * 35}ms backwards`,
+                }}
+              >
+                {n.label}
+              </button>
+            ))}
+          </nav>
+        )}
       </header>
 
       <main style={{ maxWidth: 1080, margin: "0 auto", padding: "30px 20px 60px" }}>
